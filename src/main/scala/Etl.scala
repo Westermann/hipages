@@ -2,6 +2,7 @@ package com.hipages.hitest
 
 
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import scala.util.Properties
 
@@ -14,14 +15,24 @@ object Etl {
 
   def main(args: Array[String]): Unit = {
 
+    // Provide Spark
     implicit val spark = SparkSession.builder
       .appName("HiPagesEtl")
       .config("spark.master", "local[*]")
       .getOrCreate()
 
-    val df = loadJson
-    println(createUserEventTable(df).show())
+    // Load data
+    val rawDf = loadJson
 
+    // Transform data
+    val userActivityDf = createUserEventDf(rawDf)
+    val hourlyActivityDf = createHourlyActivityDf(userActivityDf)
+
+    // Store output
+    userActivityDf.write.format("csv").mode("overwrite").save(s"$targetDirectoryPath/user_activity.csv")
+    hourlyActivityDf.write.format("csv").mode("overwrite").save(s"$targetDirectoryPath/hourly_activity.csv")
+
+    // Stop Spark
     spark.stop
   }
 
@@ -35,9 +46,9 @@ object Etl {
     jsonDf
   }
 
-  def createUserEventTable(df: DataFrame)(implicit spark: SparkSession): DataFrame = {
+  def createUserEventDf(rawDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
     val extractUrlPartsUdf = udf(extractUrlParts(_))
-    df
+    rawDf
       .withColumn("url_split", extractUrlPartsUdf(col("url")))
       .withColumn("url_level1", col("url_split").getItem(0))
       .withColumn("url_level2", col("url_split").getItem(1))
@@ -47,6 +58,19 @@ object Etl {
       .withColumnRenamed("action", "activity")
       .withColumnRenamed("timestamp", "time_stamp")
       .select("user_id", "time_stamp", "url_level1", "url_level2", "url_level3", "activity")
+  }
+
+  def createHourlyActivityDf(userActivityDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
+    userActivityDf
+      .groupBy(
+        from_unixtime(unix_timestamp(col("time_stamp"), "dd/MM/yyyy HH:mm:ss"), "yyyyMMddHH").as("time_bucket"),
+        col("url_level1"),
+        col("activity")
+      )
+      .agg(
+        count("activity").as("activity_count"),
+        countDistinct("user_id").as("user_count")
+      )
   }
 
   def extractUrlParts(url: String): Seq[String] = {
