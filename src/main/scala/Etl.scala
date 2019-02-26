@@ -9,9 +9,8 @@ import scala.util.Properties
 
 object Etl {
 
-  var jsonSchemaResourcePath: String = Properties.envOrElse("SCHEMA_RESOURCE", "source_data_schema.json")
-  var rawJsonFilePath: String = Properties.envOrElse("SOURCE_PATH", "src/main/resources/source_event_data.json")
-  var targetDirectoryPath: String = Properties.envOrElse("TARGET_DIR", "output")
+  var rawJsonFilePath: String = Properties.envOrElse("SOURCE_PATH", "Please provide source file path relative to ./data")
+  var targetDirectoryPath: String = Properties.envOrElse("TARGET_DIR", "Please provide source file path relative to ./data")
 
   def main(args: Array[String]): Unit = {
 
@@ -47,7 +46,7 @@ object Etl {
   }
 
   def createUserEventDf(rawDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
-    val extractUrlPartsUdf = udf(extractUrlParts(_))
+    val extractUrlPartsUdf = udf((s: String) => extractUrlParts(s))
     rawDf
       .withColumn("url_split", extractUrlPartsUdf(col("url")))
       .withColumn("url_level1", col("url_split").getItem(0))

@@ -2,7 +2,7 @@ lazy val root = (project in file("."))
 .settings(
     organization := "com.hipages",
     version := "0.0.1",
-    scalaVersion := "2.12.6",
+    scalaVersion := "2.11.11",
     name := "HiPages Data Engineering Test",
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-core" % "2.4.0",
